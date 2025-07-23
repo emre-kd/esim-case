@@ -4,11 +4,13 @@ import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, ref, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
+
 
 const countries = ref<{ label: string; code: string }[]>([]);
-const selectedCountryCode = ref(''); // holds ulkeKodu
-const selectedDataAmount = ref(''); // holds selected data amount (e.g., '1 GB')
-const selectedDays = ref(''); // holds selected validity period (e.g., '7 Gün')
+const selectedCountryCode = ref('');
+const selectedDataAmount = ref('');
+const selectedDays = ref('');
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -19,8 +21,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const plans = ref<any[]>([]);
 const usdEurRate = ref<number | null>(null);
-const availableDataAmounts = ref<string[]>([]); // Available data amounts for filter
-const availableDays = ref<string[]>([]); // Available validity periods for filter
+const availableDataAmounts = ref<string[]>([]);
+const availableDays = ref<string[]>([]);
 
 const cart = ref<Record<number, any>>({});
 
@@ -62,7 +64,6 @@ onMounted(async () => {
             }))
             .sort((a, b) => a.label.localeCompare(b.label));
 
-        // Preselect first country
         if (countries.value.length > 0) {
             selectedCountryCode.value = countries.value[0].code;
         }
@@ -76,16 +77,14 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
 
     try {
         const res = await axios.get(`/api/get/country/coverages/${newCode}`);
-        // Map API data to match select box format
         const allPlans = res.data.coverages.map((item: any) => ({
             id: item.id,
             country: item.coverage,
-            data: `${parseFloat(item.data_amount).toFixed(0)} GB`, // Format as "1 GB", "2 GB", etc.
-            days: `${item.validity_period} Gün`, // Format as "7 Gün", "15 Gün", etc.
+            data: `${parseFloat(item.data_amount).toFixed(0)} GB`,
+            days: `${item.validity_period} Gün`,
             price: parseFloat(item.amount),
         }));
 
-        // Extract unique data amounts and validity periods for select boxes
         availableDataAmounts.value = [...new Set(allPlans.map((plan: any) => plan.data))].sort(
             (a, b) => parseFloat(a) - parseFloat(b),
         );
@@ -93,7 +92,6 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
             (a, b) => parseFloat(a) - parseFloat(b),
         );
 
-        // Apply filters
         let filteredPlans = allPlans;
         if (newData) {
             filteredPlans = filteredPlans.filter((plan: any) => plan.data === newData);
@@ -109,6 +107,21 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
         plans.value = [];
     }
 }, { immediate: true });
+
+
+
+const goToPayment = () => {
+    if (totalItems.value > 0) {
+        router.visit('/payment', {
+            method: 'post',
+            data: {
+                cart: cart.value,
+                totalItems: totalItems.value,
+                totalAmount: totalAmount.value,
+            },
+        });
+    }
+};
 </script>
 
 <template>
@@ -172,7 +185,7 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
 
                         <ul v-else class="space-y-2">
                             <li v-for="item in Object.values(cart)" :key="item.id" class="flex justify-between">
-                                <div>{{ item.data }} x{{ item.quantity }}</div>
+                                <div>{{ item.country }} {{ item.data }} x{{ item.quantity }}</div>
                                 <div>${{ (item.price * item.quantity).toFixed(2) }}</div>
                             </li>
                         </ul>
@@ -187,7 +200,7 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
                                 <span>${{ totalAmount }}</span>
                             </div>
                             <p class="mt-1 text-xs text-red-500">*Telefonunuzun eSIM uyumlu olup olmadığını kontrol ediniz.</p>
-                            <button class="mt-3 w-full rounded bg-green-500 py-2 font-bold text-white hover:bg-green-600">
+                            <button @click="goToPayment" class="mt-3 w-full rounded bg-green-500 py-2 font-bold text-white hover:bg-green-600">
                                 Satın Al ({{ totalItems }} Plan)
                             </button>
                         </div>

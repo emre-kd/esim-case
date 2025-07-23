@@ -15,5 +15,14 @@ Route::get('/esim', function () {
     return Inertia::render('EsimDashboard');
 });
 
+
+Route::post('/payment', function (\Illuminate\Http\Request $request) {
+    return Inertia::render('Payment', [
+        'cart' => $request->input('cart'),
+        'totalItems' => $request->input('totalItems'),
+        'totalAmount' => $request->input('totalAmount'),
+    ]);
+});
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
