@@ -80,6 +80,7 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
         const allPlans = res.data.coverages.map((item: any) => ({
             id: item.id,
             country: item.coverage,
+            api_id: item.api_id,
             data: `${parseFloat(item.data_amount).toFixed(0)} GB`,
             days: `${item.validity_period} Gün`,
             price: parseFloat(item.amount),
@@ -159,7 +160,6 @@ const goToPayment = () => {
                         <!-- Plan Cards -->
                         <div v-for="plan in plans" :key="plan.id" class="flex items-center justify-between rounded border p-4">
                             <div class="flex items-center gap-4">
-                                <img src="/logo.svg" alt="Logo" class="h-10 w-10" />
                                 <div>
                                     <div class="font-bold">{{ plan.country }}</div>
                                     <div class="text-sm text-gray-500">{{ plan.data }} – {{ plan.days }}</div>
