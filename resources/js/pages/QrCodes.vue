@@ -6,7 +6,6 @@ import AppLayout from '@/layouts/AppLayout.vue';
 const page = usePage();
 const sales = page.props.sales || [];
 
-// Function to consolidate fragmented API data into unified sale objects
 const consolidateSales = (salesData: any[]) => {
   const consolidated: any[] = [];
   let currentSale: any = {};
@@ -35,7 +34,6 @@ const consolidateSales = (salesData: any[]) => {
   return consolidated;
 };
 
-// Computed property to filter and consolidate sales
 const filteredSales = computed(() => {
   const consolidatedSales = consolidateSales(sales);
   return consolidatedSales.filter(

@@ -54,6 +54,22 @@ const totalAmount = computed(() =>
         .toFixed(2),
 );
 
+const goToPayment = () => {
+    if (totalItems.value > 0) {
+        router.visit('/payment', {
+            method: 'post',
+            data: {
+                cart: cart.value,
+                totalItems: totalItems.value,
+                totalAmount: totalAmount.value,
+            },
+        });
+    }
+};
+
+
+// Foknsiyonlar
+
 onMounted(async () => {
     try {
         const res = await axios.get('/api/get/countries');
@@ -111,18 +127,7 @@ watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, 
 
 
 
-const goToPayment = () => {
-    if (totalItems.value > 0) {
-        router.visit('/payment', {
-            method: 'post',
-            data: {
-                cart: cart.value,
-                totalItems: totalItems.value,
-                totalAmount: totalAmount.value,
-            },
-        });
-    }
-};
+
 </script>
 
 <template>
@@ -131,11 +136,11 @@ const goToPayment = () => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
             <div class="relative min-h-[100vh] flex-1 rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-                <!-- eSIM Section Start -->
+
                 <div class="flex flex-col gap-4 p-6 md:flex-row">
-                    <!-- Left: eSIM Plans -->
+
                     <div class="w-full space-y-4 md:w-2/3">
-                        <!-- Filters -->
+
                         <div class="mb-2 flex gap-2">
                             <select v-model="selectedCountryCode" class="rounded border px-2 py-1">
                                 <option v-for="country in countries" :key="country.code" :value="country.code">
@@ -157,7 +162,6 @@ const goToPayment = () => {
                             </select>
                         </div>
 
-                        <!-- Plan Cards -->
                         <div v-for="plan in plans" :key="plan.id" class="flex items-center justify-between rounded border p-4">
                             <div class="flex items-center gap-4">
                                 <div>
@@ -174,7 +178,6 @@ const goToPayment = () => {
                         </div>
                     </div>
 
-                    <!-- Right: Cart -->
                     <div class="w-full space-y-2 rounded border p-4 md:w-1/3">
                         <div class="flex items-center justify-between">
                             <h3 class="font-bold">Seçilen Planlar</h3>
@@ -199,14 +202,13 @@ const goToPayment = () => {
                                 <span>Toplam Tutar:</span>
                                 <span>${{ totalAmount }}</span>
                             </div>
-                            <p class="mt-1 text-xs text-red-500">*Telefonunuzun eSIM uyumlu olup olmadığını kontrol ediniz.</p>
                             <button @click="goToPayment" class="mt-3 w-full rounded bg-green-500 py-2 font-bold text-white hover:bg-green-600">
                                 Satın Al ({{ totalItems }} Plan)
                             </button>
                         </div>
                     </div>
                 </div>
-                <!-- eSIM Section End -->
+
             </div>
         </div>
     </AppLayout>

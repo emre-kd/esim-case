@@ -8,10 +8,10 @@ const page = usePage();
 const pendingEsimIds = ref<number[]>(page.props.pendingEsimIds || []);
 const verificationCode = ref('');
 const confirmedSales = ref<any[]>([]);
-const isLoading = ref(false); // loading state for the button
+const isLoading = ref(false);
 
 const confirmSale = async () => {
-  if (isLoading.value) return; // prevent double click
+  if (isLoading.value) return;
   isLoading.value = true;
 
   if (!pendingEsimIds.value.length) {
