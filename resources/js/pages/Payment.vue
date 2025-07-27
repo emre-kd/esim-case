@@ -11,6 +11,7 @@ const props = page.props as {
     totalAmount: string;
 };
 
+// Form fields
 const cardNumber = ref('');
 const expiryDate = ref('');
 const cvc = ref('');
@@ -18,111 +19,109 @@ const email = ref('example@mail.com');
 const phoneNumber = ref('5554443322');
 const pendingEsimIds = ref<number[]>([]);
 
+// --- Formatlama ve Validasyon Yardımcıları ---
+
 const onlyDigits = (event: Event, field: 'cardNumber' | 'cvc', maxLength: number) => {
     const input = event.target as HTMLInputElement;
-    input.value = input.value.replace(/\D/g, '').slice(0, maxLength);
-    if (field === 'cardNumber') cardNumber.value = input.value;
-    if (field === 'cvc') cvc.value = input.value;
+    const cleaned = input.value.replace(/\D/g, '').slice(0, maxLength);
+    if (field === 'cardNumber') cardNumber.value = cleaned;
+    if (field === 'cvc') cvc.value = cleaned;
 };
-
 
 const formatExpiryDate = (event: Event) => {
-    let input = (event.target as HTMLInputElement).value.replace(/[^\d]/g, '');
-    if (input.length >= 3) {
-        input = input.slice(0, 2) + '/' + input.slice(2, 4);
+    let digits = (event.target as HTMLInputElement).value.replace(/[^\d]/g, '');
+    if (digits.length >= 3) {
+        digits = `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
     }
-    expiryDate.value = input.slice(0, 5);
+    expiryDate.value = digits.slice(0, 5);
 };
 
-const submitPayment = async () => {
-    console.log('submitPayment triggered');
-    console.log('Form Inputs:', {
-        email: email.value,
-        phoneNumber: phoneNumber.value,
-        cardNumber: cardNumber.value,
-        expiryDate: expiryDate.value,
-        cvc: cvc.value,
-    });
-
-
+const isValidForm = (): boolean => {
     if (!email.value || !phoneNumber.value || !cardNumber.value || !expiryDate.value || !cvc.value) {
-        alert('Lütfen boş alanları doldurunuz.');
-        return;
+        alert('Lütfen tüm alanları doldurun.');
+        return false;
     }
-
     if (!/^\d{16}$/.test(cardNumber.value)) {
         alert('Kart numarası 16 haneli olmalıdır.');
-        return;
+        return false;
     }
-
     if (!/^\d{3}$/.test(cvc.value)) {
         alert('CVC 3 haneli olmalıdır.');
-        return;
+        return false;
     }
-
     if (!/^\d{2}\/\d{2}$/.test(expiryDate.value)) {
         alert('Son kullanma tarihi MM/YY formatında olmalıdır.');
+        return false;
+    }
+    return true;
+};
+
+const extractApiIds = (): string[] => {
+    const ids: string[] = [];
+
+    Object.values(props.cart).forEach((item: any) => {
+        for (let i = 0; i < item.quantity; i++) {
+            if (Array.isArray(item.api_id)) {
+                item.api_id.forEach((id) => id && ids.push(String(id)));
+            } else if (item.api_id) {
+                ids.push(String(item.api_id));
+            }
+        }
+    });
+
+    return ids;
+};
+
+const handleError = (error: any) => {
+    if (axios.isAxiosError(error)) {
+        const message = error.response?.data?.message || error.message;
+        alert(`eSIM oluşturulurken hata oluştu: ${message}`);
+    } else {
+        alert('Beklenmeyen bir hata oluştu.');
+    }
+};
+
+// --- Ana Ödeme Fonksiyonu ---
+
+const submitPayment = async () => {
+    console.log('Ödeme başlatılıyor:', { email: email.value, phoneNumber: phoneNumber.value });
+
+    if (!isValidForm()) return;
+
+    const apiIds = extractApiIds();
+
+    if (!apiIds.length) {
+        alert('Sepette geçerli eSIM ID bulunamadı.');
         return;
     }
 
     try {
-        const apiIds: string[] = [];
-        Object.values(props.cart).forEach((item: any) => {
-            for (let i = 0; i < item.quantity; i++) {
-                if (Array.isArray(item.api_id)) {
-                    item.api_id.forEach((id: any) => {
-                        if (id) apiIds.push(String(id));
-                    });
-                } else if (item.api_id) {
-                    apiIds.push(String(item.api_id));
-                }
-            }
-        });
-
-        if (!apiIds.length) {
-            alert('Sepette geçerli eSIM ID bulunamadı.');
-            return;
-        }
-
-        const postData = {
+        const { data } = await axios.post(route('tamamliyo.esim.create'), {
             api_id: apiIds,
             gsm_no: phoneNumber.value,
             email: email.value,
-        };
+        });
 
-        const response = await axios.post('/api/proxy/esim-create', postData);
+        const soldEsimRaw = data.sold_esim;
+        const soldList = Array.isArray(soldEsimRaw) ? soldEsimRaw : soldEsimRaw ? [soldEsimRaw] : [];
 
-        const soldEsimRaw = response.data.sold_esim;
-        const soldEsimList = Array.isArray(soldEsimRaw) ? soldEsimRaw : soldEsimRaw ? [soldEsimRaw] : [];
-
-        pendingEsimIds.value = soldEsimList.map((item: any) => item.id);
+        pendingEsimIds.value = soldList.map((item: any) => item.id);
 
         if (!pendingEsimIds.value.length) {
             alert('API yanıtında eSIM ID bulunamadı.');
             return;
         }
 
-        router.get(
-            '/payment/verify',
-            {
-                pendingEsimIds: pendingEsimIds.value,
-            },
-            {
-                onError: (error) => {
-                    console.error('Navigation error:', error);
-                    alert('Doğrulama sayfasına yönlendirme başarısız.');
-                },
-            },
-        );
-    } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-            alert(`eSIM oluşturulurken hata oluştu: ${error.response?.data?.message || error.message}`);
-        } else {
-            alert('Beklenmeyen bir hata oluştu.');
-        }
+        router.get(route('payment.verify'), { pendingEsimIds: pendingEsimIds.value }, {
+            onError: () => alert('Doğrulama sayfasına yönlendirme başarısız.')
+        });
+
+    } catch (error) {
+        handleError(error);
     }
 };
 </script>
+
 
 <template>
     <Head title="Ödeme Sayfası" />

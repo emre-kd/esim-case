@@ -3,45 +3,41 @@ import { computed } from 'vue';
 import { usePage, Head } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 
+// Props'tan gelen sales verisi
 const page = usePage();
-const sales = page.props.sales || [];
+const sales = page.props.sales as any[] || [];
 
+// Tek bir satış objesi oluşturma mantığı (consolidate)
 const consolidateSales = (salesData: any[]) => {
   const consolidated: any[] = [];
   let currentSale: any = {};
 
   salesData.forEach((item) => {
     if (item.id) {
-      if (Object.keys(currentSale).length > 0) {
-        consolidated.push(currentSale);
-      }
+      // Önceki satış varsa listeye ekle
+      if (Object.keys(currentSale).length) consolidated.push(currentSale);
       currentSale = { id: item.id };
-    }
-    else if (item.title) {
-      currentSale.title = item.title;
-    } else if (item.coverage) {
-      currentSale.coverage = item.coverage;
-    }
-    else if (item.parameters?.data?.[0]?.esimDetail?.[0]?.qr_code) {
-      currentSale.qr_code = item.parameters.data[0].esimDetail[0].qr_code;
+    } else {
+      // Gelen item'da ilgili alanlar varsa currentSale'a ekle
+      if (item.title) currentSale.title = item.title;
+      if (item.coverage) currentSale.coverage = item.coverage;
+      const qrCode = item.parameters?.data?.[0]?.esimDetail?.[0]?.qr_code;
+      if (qrCode) currentSale.qr_code = qrCode;
     }
   });
 
-  if (Object.keys(currentSale).length > 0) {
-    consolidated.push(currentSale);
-  }
+  if (Object.keys(currentSale).length) consolidated.push(currentSale);
 
   return consolidated;
 };
 
+// Eksik veri olmayan satışları filtrele
 const filteredSales = computed(() => {
-  const consolidatedSales = consolidateSales(sales);
-  return consolidatedSales.filter(
+  return consolidateSales(sales).filter(
     (sale) => sale.coverage && sale.title && sale.qr_code
   );
 });
 
-console.log('Filtered Sales:', filteredSales.value);
 </script>
 
 <template>
@@ -64,11 +60,15 @@ console.log('Filtered Sales:', filteredSales.value);
             <td class="py-2 px-4 border-b">{{ sale.coverage }}</td>
             <td class="py-2 px-4 border-b">{{ sale.title }}</td>
             <td class="py-2 px-4 border-b">
-              <span v-if="sale.qr_code">
-                <a :href="sale.qr_code" class="text-blue-600 underline" target="_blank">
-                  QR Kodu Görüntüle
-                </a>
-              </span>
+              <a
+                v-if="sale.qr_code"
+                :href="sale.qr_code"
+                class="text-blue-600 underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                QR Kodu Görüntüle
+              </a>
               <span v-else>Yok</span>
             </td>
           </tr>

@@ -3,6 +3,8 @@ import { Head, usePage, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref } from 'vue';
 import axios from 'axios';
+import { route } from 'ziggy-js'; // Laravel rotalarını JS içinde isimleriyle kullanmanı sağlar.
+
 
 const page = usePage();
 const pendingEsimIds = ref<number[]>(page.props.pendingEsimIds || []);
@@ -10,70 +12,85 @@ const verificationCode = ref('');
 const confirmedSales = ref<any[]>([]);
 const isLoading = ref(false);
 
+const ALERT_MESSAGES = {
+  noPendingEsim: 'Onaylanacak eSIM bulunamadı.',
+  emptyVerificationCode: 'Lütfen doğrulama kodunu girin',
+  confirmationFailed: (msg: string) => `Satış onayı başarısız: ${msg}`,
+  confirmationError: (msg: string) => `Satış onayı sırasında hata oluştu: ${msg}`,
+  unexpectedError: (msg: string) => `İşlem sırasında beklenmeyen bir hata oluştu: ${msg}`,
+  qrNavigationFailed: 'QR kodları sayfasına yönlendirme başarısız.',
+};
+
+const confirmSingleSale = async (soldEsimId: number) => {
+  const confirmPayload = {
+    id: soldEsimId,
+    kartCvv: '000',
+    kartNo: '9792100000000001',
+    kartSonKullanmaTarihi: '2028-02-01',
+    kartSahibi: 'Tamamliyo Yazılım',
+    taksitSayisi: 1,
+  };
+
+  try {
+    const res = await axios.post(route('tamamliyo.esim.confirm'), confirmPayload);
+    if (res.data.status === true) {
+      return res.data.sold_esim;
+    } else {
+      throw new Error(res.data.message || 'Bilinmeyen hata');
+    }
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || error.message || 'Bilinmeyen hata';
+    throw new Error(msg);
+  }
+};
+
 const confirmSale = async () => {
   if (isLoading.value) return;
   isLoading.value = true;
 
-  if (!pendingEsimIds.value.length) {
-    alert('Onaylanacak eSIM bulunamadı.');
-    isLoading.value = false;
-    return;
-  }
-
-  if (!verificationCode.value) {
-    alert('Lütfen doğrulama kodunu girin');
-    isLoading.value = false;
-    return;
-  }
-
-  const sales: any[] = [];
-
   try {
-    for (const soldEsimId of pendingEsimIds.value) {
-      const confirmPayload = {
-        id: soldEsimId,
-        kartCvv: '000',
-        kartNo: '9792100000000001',
-        kartSonKullanmaTarihi: '2028-02-01',
-        kartSahibi: 'Tamamliyo Yazılım',
-        taksitSayisi: 1,
-      };
+    if (!pendingEsimIds.value.length) {
+      alert(ALERT_MESSAGES.noPendingEsim);
+      return;
+    }
 
+    if (!verificationCode.value.trim()) {
+      alert(ALERT_MESSAGES.emptyVerificationCode);
+      return;
+    }
+
+    const sales: any[] = [];
+
+    for (const soldEsimId of pendingEsimIds.value) {
       try {
-        const res = await axios.post('/api/proxy/esim-confirm', confirmPayload);
-        if (res.data.status === true) {
-          sales.push(res.data.sold_esim);
-        } else {
-          alert(`Satış onayı başarısız: ${res.data.message}`);
-          isLoading.value = false;
-          return;
-        }
-      } catch (error: any) {
-        alert(`Satış onayı sırasında hata oluştu: ${error?.response?.data?.message || error.message}`);
-        isLoading.value = false;
+        const sale = await confirmSingleSale(soldEsimId);
+        sales.push(sale);
+      } catch (err: any) {
+        alert(ALERT_MESSAGES.confirmationFailed(err.message));
         return;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // API’yi yormamak için ufak delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
     confirmedSales.value = sales;
 
-    router.get('/payment/qr-codes', {
-      sales: confirmedSales.value,
-    }, {
-      onError: (error) => {
-        console.error('Navigation error:', error);
-        alert('QR kodları sayfasına yönlendirme başarısız.');
+    router.get(
+      route('payment.qr'),
+      { sales: confirmedSales.value },
+      {
+        onError: () => alert(ALERT_MESSAGES.qrNavigationFailed),
       },
-    });
+    );
   } catch (error: any) {
-    alert('İşlem sırasında beklenmeyen bir hata oluştu: ' + (error?.response?.data?.message || error.message));
+    alert(ALERT_MESSAGES.unexpectedError(error.message));
   } finally {
     isLoading.value = false;
   }
 };
 </script>
+
 
 <template>
   <Head title="Doğrulama" />

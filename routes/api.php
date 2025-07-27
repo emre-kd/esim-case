@@ -1,51 +1,14 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Http;
+use App\Http\Controllers\TamamliyoApiController;
+use Illuminate\Http\Request;
 
+Route::middleware('auth:sanctum')->get('/user', fn(Request $request) => $request->user());
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-Route::get('/get/countries', function () {
-    $response = Http::withHeaders([
-        'Accept' => 'application/json',
-        'token' => '7c57f824afbac3bd4c60c60cd27eca35',
-    ])->get('https://api-test.tamamliyo.com/partner/v1/esim/countries');
-
-    return $response->json();
-});
-
-
-Route::get('/get/country/coverages/{ulkeKodu}', function ($ulkeKodu) {
-    $response = Http::withHeaders([
-        'Accept' => 'application/json',
-        'token' => '7c57f824afbac3bd4c60c60cd27eca35',
-    ])->get("https://api-test.tamamliyo.com/partner/v1/esim/coverages/{$ulkeKodu}");
-
-    return $response->json();
-});
-
-
-
-Route::post('/proxy/esim-create', function (Request $request) {
-    $response = Http::withHeaders([
-        'Accept' => 'application/json',
-        'token' => '7c57f824afbac3bd4c60c60cd27eca35',
-    ])->post('https://api-test.tamamliyo.com/partner/v1/esim/create', $request->all());
-
-    return response($response->body(), $response->status())
-        ->header('Content-Type', $response->header('Content-Type'));
-});
-
-
-Route::post('/proxy/esim-confirm', function (Request $request) {
-    $response = Http::withHeaders([
-        'Accept' => 'application/json',
-        'token' => '7c57f824afbac3bd4c60c60cd27eca35',
-    ])->post('https://api-test.tamamliyo.com/partner/v1/esim/confirm', $request->all());
-
-    return $response->json();
+Route::prefix('tamamliyo')->name('tamamliyo.')->group(function () {
+    Route::get('/countries', [TamamliyoApiController::class, 'getCountries'])->name('countries');
+    Route::get('/country/coverages/{countryCode}', [TamamliyoApiController::class, 'getCoverages'])->name('coverages');
+    Route::post('/esim-create', [TamamliyoApiController::class, 'createEsim'])->name('esim.create');
+    Route::post('/esim-confirm', [TamamliyoApiController::class, 'confirmEsim'])->name('esim.confirm');
 });

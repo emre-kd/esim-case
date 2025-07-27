@@ -2,58 +2,27 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Illuminate\Http\Request;
+use App\Http\Controllers\PaymentController;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+// Ana Sayfa
+Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::get('/esim', function () {
-    return Inertia::render('EsimDashboard');
+// Dashboard
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
 });
 
+// eSIM Dashboard
+Route::get('/esim', fn () => Inertia::render('EsimDashboard'))->name('esim.dashboard');
 
-Route::post('/payment', function (\Illuminate\Http\Request $request) {
-    return Inertia::render('Payment', [
-        'cart' => $request->input('cart'),
-        'totalItems' => $request->input('totalItems'),
-        'totalAmount' => $request->input('totalAmount'),
-    ]);
+// Payment Routes
+Route::prefix('payment')->name('payment.')->group(function () {
+    Route::post('/', [PaymentController::class, 'store'])->name('store');
+    Route::get('/', [PaymentController::class, 'show'])->name('show');
+    Route::get('/verify', [PaymentController::class, 'verify'])->name('verify');
+    Route::get('/qr-codes', [PaymentController::class, 'qrCodes'])->name('qr');
 });
 
-
-Route::get('/payment', function (Request $request) {
-    $cart = $request->session()->get('cart', []);
-    $totalItems = $request->session()->get('totalItems', 0);
-    $totalAmount = $request->session()->get('totalAmount', '0.00');
-
-    return Inertia::render('Payment', [
-        'cart' => $cart,
-        'totalItems' => $totalItems,
-        'totalAmount' => $totalAmount,
-    ]);
-})->name('payment.show');
-
-Route::get('/payment/verify', function (Request $request) {
-    $pendingEsimIds = $request->query('pendingEsimIds', []);
-    $pendingEsimIds = array_map('intval', (array) $pendingEsimIds);
-
-    \Log::info('Verification page props', ['pendingEsimIds' => $pendingEsimIds]);
-
-    return Inertia::render('PaymentVerify', [
-        'pendingEsimIds' => $pendingEsimIds,
-    ]);
-})->name('payment.verify');
-
-Route::get('/payment/qr-codes', function () {
-    return Inertia::render('QrCodes', [
-        'sales' => request()->input('sales', []),
-    ]);
-});
-
+// Diğer route dosyaları
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

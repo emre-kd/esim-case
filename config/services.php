@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'tamamliyo' => [
+    'base_url' => env('TAMAMLIYO_BASE_URL'),
+    'token' => env('TAMAMLIYO_TOKEN'),
+    ],
+
+
 ];

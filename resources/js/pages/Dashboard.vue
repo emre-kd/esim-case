@@ -1,62 +1,86 @@
 <script setup lang="ts">
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import axios from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+    import AppLayout from '@/layouts/AppLayout.vue';
+    import { Head, router } from '@inertiajs/vue3';
+    import axios from 'axios';
+    import { onMounted, ref, watch } from 'vue';
+    import { type BreadcrumbItem } from '@/types';
+    import { useCart } from '@/composables/useCart';
+    import { route } from 'ziggy-js';
 
 
-const countries = ref<{ label: string; code: string }[]>([]);
-const selectedCountryCode = ref('');
-const selectedDataAmount = ref('');
-const selectedDays = ref('');
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
+    const countries = ref<{ label: string; code: string }[]>([]);
+    const selectedCountryCode = ref('');
+    const selectedDataAmount = ref('');
+    const selectedDays = ref('');
 
-const plans = ref<any[]>([]);
-const usdEurRate = ref<number | null>(null);
-const availableDataAmounts = ref<string[]>([]);
-const availableDays = ref<string[]>([]);
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Dashboard', href: route('dashboard') },
+    ];
 
-const cart = ref<Record<number, any>>({});
+    const plans = ref<any[]>([]);
+    const availableDataAmounts = ref<string[]>([]);
+    const availableDays = ref<string[]>([]);
+    const usdEurRate = ref<number | null>(null);
 
-const addToCart = (plan: any) => {
-    if (!cart.value[plan.id]) {
-        cart.value[plan.id] = { ...plan, quantity: 1 };
-    } else {
-        cart.value[plan.id].quantity++;
-    }
-};
+    const {
+        cart,
+        add: addToCart,
+        remove: removeFromCart,
+        clear: clearCart,
+        totalItems,
+        totalAmount
+    } = useCart();
 
-const removeFromCart = (plan: any) => {
-    if (cart.value[plan.id]?.quantity > 1) {
-        cart.value[plan.id].quantity--;
-    } else {
-        delete cart.value[plan.id];
-    }
-};
+    // API Calls
 
-const clearCart = () => {
-    cart.value = {};
-};
+    const fetchCountries = async () => {
+        try {
+            const res = await axios.get(route('tamamliyo.countries'));
+            countries.value = res.data.data
+                .map((item: any) => ({ label: item.ulkeAd, code: item.ulkeKodu }))
+                .sort((a, b) => a.label.localeCompare(b.label));
 
-const totalItems = computed(() => Object.values(cart.value).reduce((acc: number, item: any) => acc + item.quantity, 0));
+            selectedCountryCode.value = countries.value[0]?.code || '';
+        } catch (err) {
+            console.error('Ülkeler alınamadı:', err);
+        }
+    };
 
-const totalAmount = computed(() =>
-    Object.values(cart.value)
-        .reduce((acc: number, item: any) => acc + item.price * item.quantity, 0)
-        .toFixed(2),
-);
+    const fetchPlans = async () => {
+        if (!selectedCountryCode.value) return;
 
-const goToPayment = () => {
-    if (totalItems.value > 0) {
-        router.visit('/payment', {
+        try {
+            const res = await axios.get(route('tamamliyo.coverages', { countryCode: selectedCountryCode.value }));
+            const allPlans = res.data.coverages.map((item: any) => ({
+                id: item.id,
+                country: item.coverage,
+                api_id: item.api_id,
+                data: `${parseFloat(item.data_amount).toFixed(0)} GB`,
+                days: `${item.validity_period} Gün`,
+                price: parseFloat(item.amount),
+            }));
+
+            // Dropdown değerlerini ayarla
+            availableDataAmounts.value = [...new Set(allPlans.map(p => p.data))].sort((a, b) => parseFloat(a) - parseFloat(b));
+            availableDays.value = [...new Set(allPlans.map(p => p.days))].sort((a, b) => parseFloat(a) - parseFloat(b));
+
+            // Filtrele
+            plans.value = allPlans
+                .filter(plan => !selectedDataAmount.value || plan.data === selectedDataAmount.value)
+                .filter(plan => !selectedDays.value || plan.days === selectedDays.value);
+
+            usdEurRate.value = res.data.usdEurRate;
+        } catch (err) {
+            console.error('Planlar alınamadı:', err);
+            plans.value = [];
+        }
+    };
+
+    const goToPayment = () => {
+        if (totalItems.value === 0) return;
+
+        router.visit(route('payment.store'), {
             method: 'post',
             data: {
                 cart: cart.value,
@@ -64,68 +88,13 @@ const goToPayment = () => {
                 totalAmount: totalAmount.value,
             },
         });
-    }
-};
+    };
 
+    // Lifecycle
 
-// Foknsiyonlar
+    onMounted(fetchCountries);
 
-onMounted(async () => {
-    try {
-        const res = await axios.get('/api/get/countries');
-        countries.value = res.data.data
-            .map((item: any) => ({
-                label: item.ulkeAd,
-                code: item.ulkeKodu,
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label));
-
-        if (countries.value.length > 0) {
-            selectedCountryCode.value = countries.value[0].code;
-        }
-    } catch (err) {
-        console.error('Failed to fetch countries', err);
-    }
-});
-
-watch([selectedCountryCode, selectedDataAmount, selectedDays], async ([newCode, newData, newDays]) => {
-    if (!newCode) return;
-
-    try {
-        const res = await axios.get(`/api/get/country/coverages/${newCode}`);
-        const allPlans = res.data.coverages.map((item: any) => ({
-            id: item.id,
-            country: item.coverage,
-            api_id: item.api_id,
-            data: `${parseFloat(item.data_amount).toFixed(0)} GB`,
-            days: `${item.validity_period} Gün`,
-            price: parseFloat(item.amount),
-        }));
-
-        availableDataAmounts.value = [...new Set(allPlans.map((plan: any) => plan.data))].sort(
-            (a, b) => parseFloat(a) - parseFloat(b),
-        );
-        availableDays.value = [...new Set(allPlans.map((plan: any) => plan.days))].sort(
-            (a, b) => parseFloat(a) - parseFloat(b),
-        );
-
-        let filteredPlans = allPlans;
-        if (newData) {
-            filteredPlans = filteredPlans.filter((plan: any) => plan.data === newData);
-        }
-        if (newDays) {
-            filteredPlans = filteredPlans.filter((plan: any) => plan.days === newDays);
-        }
-
-        plans.value = filteredPlans;
-        usdEurRate.value = res.data.usdEurRate;
-    } catch (err) {
-        console.error('Coverages fetch failed:', err);
-        plans.value = [];
-    }
-}, { immediate: true });
-
-
+    watch([selectedCountryCode, selectedDataAmount, selectedDays], fetchPlans, { immediate: true });
 
 
 </script>
