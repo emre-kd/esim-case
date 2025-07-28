@@ -8,7 +8,7 @@ import { route } from 'ziggy-js'; // Laravel rotalarını JS içinde isimleriyle
 
 const page = usePage();
 const pendingEsimIds = ref<number[]>(page.props.pendingEsimIds || []);
-const verificationCode = ref('');
+const verificationCode = ref('000');
 const confirmedSales = ref<any[]>([]);
 const isLoading = ref(false);
 
@@ -97,13 +97,14 @@ const confirmSale = async () => {
 
   <AppLayout>
     <div class="p-6 max-w-md mx-auto text-center">
-      <h1 class="text-2xl font-bold mb-4">Doğrulama Kodu</h1>
+      <h1 class="text-2xl font-bold mb-4">Doğrulama Kodu <br> (Direkt gönder)</h1>
 
       <input
         v-model="verificationCode"
         type="text"
         placeholder="Doğrulama kodunu girin"
         class="border rounded px-4 py-2 mt-4 w-full max-w-xs mx-auto"
+
       />
 
       <button
